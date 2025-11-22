@@ -37,7 +37,7 @@
     #modelViewerContainer {
       margin-top: 30px;
       width: 100%;
-      height: 600px;
+      aspect-ratio: 1 / 1;
       visibility: hidden;
     }
     #fileInput {
@@ -79,6 +79,11 @@
       下载模型
     </button>
 
+    <!-- 新增：全屏按钮 -->
+    <button id="fullscreenBtn" class="custom-file-upload" style="display:none" disabled>
+      全屏展示
+    </button>
+
     <input type="file" id="fileInput" accept=".gltf, .glb">
     
     <a id="downloadLink" style="display: none;">下载图像</a>
@@ -117,6 +122,7 @@
     const uploadBtn = document.getElementById('uploadBtn');
     const modelViewerContainer = document.getElementById('modelViewerContainer');
     const uploadPrompt = document.getElementById('uploadPrompt');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
 
     const loadingBarContainer = document.getElementById("loadingBarContainer");
     const loadingBar = document.getElementById("loadingBar");
@@ -137,9 +143,11 @@
 
         captureBtn.style.display = "inline-block";
         downloadModelBtn.style.display = "inline-block";
+        fullscreenBtn.style.display = "inline-block";
         
         captureBtn.disabled = false;
         downloadModelBtn.disabled = false;
+        fullscreenBtn.disabled = false;
 
         downloadModelBtn.textContent = "下载模型";
     }
@@ -162,6 +170,7 @@
 
         captureBtn.style.display = "none";
         downloadModelBtn.style.display = "none";
+        fullscreenBtn.style.display = "none";
 
         setTimeout(() => {
             fileInput.click();
@@ -204,6 +213,13 @@
         }
     });
 
+    fullscreenBtn.addEventListener('click', () => {
+        const elem = modelViewerContainer;
+        if (elem.requestFullscreen) elem.requestFullscreen();
+        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+        else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+    });
+
     modelViewer.addEventListener("progress", (event) => {
         const progress = event.detail.totalProgress;
         if (progress < 1) {
@@ -215,6 +231,15 @@
                 loadingBarContainer.style.display = "none";
             }, 400);
         }
+    });
+
+    modelViewer.addEventListener("error", () => {
+        uploadPrompt.textContent = "模型加载失败，请重新选择模型文件。";
+        uploadPrompt.style.display = "block";
+        modelViewerContainer.style.visibility = "hidden";
+        captureBtn.style.display = "none";
+        downloadModelBtn.style.display = "none";
+        fullscreenBtn.style.display = "none";
     });
 
   </script>
