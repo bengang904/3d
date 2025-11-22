@@ -34,7 +34,7 @@ function renderGallery(data) {
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-            <a href="viewer.html?model=${encodeURIComponent(model.glb)}" style="text-decoration: none; color: inherit;">
+            <a href="look.html?model=${encodeURIComponent(model.glb)}" style="text-decoration: none; color: inherit;">
                 <img src="${model.image}" alt="${model.name}" />
                 <h3>${model.name}</h3>
             </a>
@@ -75,3 +75,4 @@ function filterCards() {
 
     executeFilter(input);
 }
+
