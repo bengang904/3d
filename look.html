@@ -107,15 +107,6 @@
       </model-viewer>
     </div>
   </div>
-
-<!-- 必须：给 model-viewer 提供 Draco 解码器 -->
-<script src="https://www.gstatic.com/draco/versioned/decoders/1.5.6/draco_decoder.js"></script>
-
-<!-- 必须：给 model-viewer 提供 Meshopt 解码器 -->
-<script type="module">
-  import { MeshoptDecoder } from 'https://unpkg.com/meshoptimizer/meshopt_decoder.module.js';
-  self.MeshoptDecoder = MeshoptDecoder;
-</script>
   
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <script type="module">
@@ -254,4 +245,5 @@
   </script>
 </body>
 </html>
+
 
