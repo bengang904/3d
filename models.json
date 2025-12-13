@@ -2,9 +2,15 @@
     {
       "name": "GTA-ViceCity-Tommy",
       "image": "images/capture_GTA-ViceCity-Tommy.png",
-      "glb": "model/GTA-ViceCity-Tommy.glb"
+      "glb": "look.html?model=model%2FGTA-ViceCity-Tommy.glb"
+    },
+    {
+      "name": "cs_office_with_real_light",
+      "image": "images/cs_office_with_real_light.png",
+      "glb": "look2.html?height=1.20&gravity=15.0&speed=0.6&x=31.93&y=-12.60&z=20.29&model=model%2Fcs_office_with_real_light.glb"
     }
   ]
   
 
   
+
