@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>3D场景</title>
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1; 
+        }
+        #instructions {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+        }
+        #instructions p {
+            font-size: 20px;
+            margin: 10px;
+        }
+        #loading-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            z-index: 2;
+            display: none; 
+        }
+        #coordinates {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            border-radius: 5px;
+            z-index: 3;
+        }
+        #settings-display {
+             margin-bottom: 20px; 
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading-message">
+    正在加载场景... 请稍候...
+</div>
+
+<div id="coordinates">
+    x:*, y:*, z:*
+</div>
+
+<div id="blocker">
+    <div id="instructions">
+        <p>点击这里开始游戏</p>
+        <div id="settings-display">
+        </div>
+        <p>
+            控制：W A S D 移动 | SPACE 跳跃 | CTRL 升高 | SHIFT 降低 | ESC 解锁
+        </p>
+    </div>
+</div>
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; 
+
+    let camera, scene, renderer, controls;
+    let clock;
+    let gltfLoader; 
+
+    let moveForward = false;
+    let moveBackward = false;
+    let moveLeft = false;
+    let moveRight = false;
+    let moveUp = false;     
+    let moveDown = false;   
+    let canJump = false;
+
+    let gravity;
+    let floorHeight; 
+    let speed;
+    let jumpHeight;
+    let modelPath;
+    let INITIAL_POSITION;
+    let ABSOLUTE_MIN_Y; 
+    const verticalSpeed = 3.0; 
+    const detectionMargin = 0.01; 
+    const collisionDistance = 0.5; 
+    const playerRadius = 0.2; 
+    const JUMP_MULTIPLIER = 1.4; 
+    const velocity = new THREE.Vector3(); 
+    const direction = new THREE.Vector3();
+    const raycaster = new THREE.Raycaster();
+    const tempVector = new THREE.Vector3();
+    const objects = []; 
+    const coordinatesDisplay = document.getElementById('coordinates');
+    const settingsDisplay = document.getElementById('settings-display');
+    const DEFAULTS = {
+        height: 1.8,
+        gravity: 15.0,
+        speed: 0.6,
+        x: 0,
+        y: 0,
+        z: 0,
+        model: 'cs_office_with_real_light.glb'
+    };
+    
+    function getNumericInput(paramName, promptMessage) {
+        const params = new URLSearchParams(window.location.search);
+        let value = params.get(paramName);
+        const defaultValue = DEFAULTS[paramName];
+
+        if (value === null || isNaN(parseFloat(value))) {
+            let input = prompt(promptMessage, defaultValue);
+            if (input === null) {
+                alert("场景初始化取消。");
+                throw new Error("Initialization cancelled by user.");
+            }
+            if (input.trim() === "" || isNaN(parseFloat(input))) {
+                 return parseFloat(defaultValue); 
+            }
+            value = input;
+        }
+        return parseFloat(value);
+    }
+    
+    function getStringInput(paramName, promptMessage) {
+        const params = new URLSearchParams(window.location.search);
+        let value = params.get(paramName);
+        const defaultValue = DEFAULTS[paramName];
+
+        if (value === null || value.trim() === "") {
+            let input = prompt(promptMessage, defaultValue);
+            if (input === null) {
+                alert("场景初始化取消。");
+                throw new Error("Initialization cancelled by user.");
+            }
+            if (input.trim() === "") {
+                 return defaultValue; 
+            }
+            value = input;
+        }
+        return value;
+    }
+    
+    function collectParameters() {
+        const params = {};
+        params.floorHeight = getNumericInput('height', `请输入角色身高 (height, 默认值: ${DEFAULTS.height}):`);
+        params.gravity = getNumericInput('gravity', `请输入重力加速度 (gravity, 默认值: ${DEFAULTS.gravity}):`);
+        params.speed = getNumericInput('speed', `请输入前进速度 (speed, 默认值: ${DEFAULTS.speed}):`);
+        params.x = getNumericInput('x', `请输入初始位置 X 坐标 (x, 默认值: ${DEFAULTS.x}):`);
+        params.y = getNumericInput('y', `请输入初始位置 Y 坐标 (y, 默认值: ${DEFAULTS.y}):`);
+        params.z = getNumericInput('z', `请输入初始位置 Z 坐标 (z, 默认值: ${DEFAULTS.z}):`);
+        params.modelPath = getStringInput('model', `请输入场景文件路径 (model, 默认值: ${DEFAULTS.model}):`);
+
+        return params;
+    }
+    
+    function updateUrlWithParameters(params) {
+        const newParams = new URLSearchParams();
+        newParams.set('height', params.floorHeight.toFixed(2));
+        newParams.set('gravity', params.gravity.toFixed(1));
+        newParams.set('speed', params.speed.toFixed(1));
+        newParams.set('x', params.x.toFixed(2));
+        newParams.set('y', params.y.toFixed(2));
+        newParams.set('z', params.z.toFixed(2));
+        newParams.set('model', params.modelPath);
+        
+        const newUrl = `${window.location.pathname}?${newParams.toString()}${window.location.hash}`;
+        window.history.pushState({ path: newUrl }, '', newUrl);
+    }
+    
+    function setupGameParameters() {
+        let params;
+        try {
+            params = collectParameters();
+        } catch (e) {
+            console.error(e.message);
+            return false;
+        }
+        floorHeight = params.floorHeight;
+        gravity = params.gravity;
+        speed = params.speed;
+        modelPath = params.modelPath;
+        
+        INITIAL_POSITION = {
+            x: params.x, 
+            y: params.y, 
+            z: params.z
+        };
+        
+        ABSOLUTE_MIN_Y = INITIAL_POSITION.y;
+        
+        const targetHeight = floorHeight * JUMP_MULTIPLIER;
+        jumpHeight = gravity > 0 ? Math.sqrt(2 * gravity * targetHeight) : 0; 
+        updateUrlWithParameters(params);
+        
+        settingsDisplay.innerHTML = `
+            <p>
+                实时位置: (x: -, y: -, z: -)<br />
+            </p>
+        `;
+        
+        return true;
+    }
+
+    if(setupGameParameters()) {
+        init(); 
+    }
+    
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xcccccc); 
+        scene.fog = new THREE.Fog(0xcccccc, 100, 300); 
+
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(INITIAL_POSITION.x, INITIAL_POSITION.y, INITIAL_POSITION.z); 
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+        document.body.appendChild(renderer.domElement);
+        
+        controls = new PointerLockControls(camera, document.body);
+        const blocker = document.getElementById('blocker');
+        const instructions = document.getElementById('instructions');
+        instructions.addEventListener('click', function () { controls.lock(); });
+        controls.addEventListener('lock', function () { 
+            instructions.style.display = 'none'; 
+            blocker.style.display = 'none'; 
+            coordinatesDisplay.style.display = 'block'; 
+        });
+        controls.addEventListener('unlock', function () { 
+            blocker.style.display = 'block'; 
+            instructions.style.display = 'flex'; 
+            coordinatesDisplay.style.display = 'none'; 
+        });
+        scene.add(controls.getObject());
+
+        const onKeyDown = function (event) {
+            switch (event.code) {
+                case 'KeyW': moveForward = true; break;
+                case 'KeyA': moveLeft = true; break;
+                case 'KeyS': moveBackward = true; break;
+                case 'KeyD': moveRight = true; break;
+                case 'Space': 
+                    if (canJump === true) velocity.y += jumpHeight;
+                    canJump = false; 
+                    break; 
+                case 'ControlLeft': moveUp = true; break;
+                case 'ShiftLeft': moveDown = true; break; 
+            }
+        };
+
+        const onKeyUp = function (event) {
+            switch (event.code) {
+                case 'KeyW': moveForward = false; break;
+                case 'KeyA': moveLeft = false; break;
+                case 'KeyS': moveBackward = false; break;
+                case 'KeyD': moveRight = false; break;
+                case 'ControlLeft': moveUp = false; break;     
+                case 'ShiftLeft': moveDown = false; break; 
+            }
+        };
+
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+        
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/');
+        
+        gltfLoader = new GLTFLoader();
+        gltfLoader.setDRACOLoader(dracoLoader);
+        
+        loadModel(gltfLoader); 
+        
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 2);
+        hemiLight.position.set(0, 20, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 3);
+        dirLight.position.set(-10, 20, 10);
+        dirLight.castShadow = true; 
+        dirLight.shadow.mapSize.width = 2048; 
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.left = -50;
+        dirLight.shadow.camera.right = 50;
+        dirLight.shadow.camera.top = 50;
+        dirLight.shadow.camera.bottom = -50;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 50;
+        scene.add(dirLight);
+
+        clock = new THREE.Clock();
+        window.addEventListener('resize', onWindowResize);
+        
+        coordinatesDisplay.style.display = 'none';
+    }
+    
+    function loadModel(loader) { 
+        const loadingMessage = document.getElementById('loading-message');
+        loadingMessage.style.display = 'block';
+
+        loader.load( 
+            modelPath,
+            function (gltf) {
+                const model = gltf.scene;
+                scene.add(model);
+
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        objects.push(child);
+                    }
+                });
+
+                loadingMessage.style.display = 'none';
+                animate(); 
+            },
+            function (xhr) {
+                const percent = Math.round(xhr.loaded / xhr.total * 100);
+                loadingMessage.textContent = `正在加载场景: ${percent}%`;
+            },
+            function (error) {
+                console.error('加载 GLTF 模型时出错:', error);
+                loadingMessage.textContent = '加载失败，请检查模型路径和控制台错误。';
+                animate(); 
+            }
+        );
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    const directions = [
+        new THREE.Vector3(0, 0, -1), 
+        new THREE.Vector3(0, 0, 1),  
+        new THREE.Vector3(-1, 0, 0), 
+        new THREE.Vector3(1, 0, 0)   
+    ];
+
+    function checkWallCollision() {
+        const playerObject = controls.getObject();
+        
+        for (let i = 0; i < 4; i++) {
+            const dir = directions[i].clone();
+            dir.applyQuaternion(playerObject.quaternion);
+            dir.y = 0; 
+            dir.normalize();
+
+            raycaster.set(
+                playerObject.position.clone().add(dir.clone().multiplyScalar(playerRadius)), 
+                dir
+            );
+            
+            raycaster.far = collisionDistance; 
+            const intersects = raycaster.intersectObjects(objects, true); 
+            
+            if (intersects.length > 0) {
+                if (i === 0 && moveForward) velocity.z = 0; 
+                if (i === 1 && moveBackward) velocity.z = 0; 
+                if (i === 2 && moveLeft) velocity.x = 0;     
+                if (i === 3 && moveRight) velocity.x = 0;    
+            }
+        }
+    }
+
+    function checkVerticalCollision(directionVector) {
+        const playerObject = controls.getObject();
+        
+        let hasCollision = false;
+
+        if (directionVector.y > 0) {
+            const raycasterOrigin = playerObject.position.clone();
+            const rayDirection = tempVector.set(0, 1, 0);
+            const rayDistance = Math.abs(directionVector.y) + detectionMargin; 
+            
+            raycaster.set(raycasterOrigin, rayDirection);
+            raycaster.far = rayDistance;
+            
+            const intersections = raycaster.intersectObjects(objects, true);
+            if (intersections.length > 0) {
+                const intersectionPointY = intersections[0].point.y;
+                playerObject.position.y = intersectionPointY - detectionMargin; 
+                velocity.y = 0; 
+                hasCollision = true;
+            }
+
+        } else if (directionVector.y < 0) {
+            const rayDirection = tempVector.set(0, -1, 0);
+            const raycasterOrigin = playerObject.position.clone(); 
+            const rayDistance = floorHeight + Math.abs(directionVector.y) + detectionMargin;
+
+            raycaster.set(raycasterOrigin, rayDirection);
+            raycaster.far = rayDistance;
+
+            const intersections = raycaster.intersectObjects(objects, true);
+            if (intersections.length > 0) {
+                const intersection = intersections[0];
+                const intersectionPointY = intersection.point.y;
+                const playerFeetY = playerObject.position.y - floorHeight;
+                if (playerFeetY + directionVector.y < intersectionPointY + detectionMargin) { 
+                    playerObject.position.y = intersectionPointY + floorHeight + detectionMargin; 
+                    canJump = true;
+                    velocity.y = 0;
+                    hasCollision = true;
+                }
+            }
+        }
+        return hasCollision;
+    }
+
+    function updateCoordinates() {
+        const position = controls.getObject().position;
+        const posText = `
+            x: ${position.x.toFixed(2)}, 
+            y: ${position.y.toFixed(2)}, 
+            z: ${position.z.toFixed(2)}
+        `;
+        
+        coordinatesDisplay.innerHTML = posText;
+        
+        settingsDisplay.innerHTML = `
+            <p>
+                实时位置: ${posText} <br />
+            </p>
+        `;
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = clock.getDelta();
+        const playerObject = controls.getObject();
+
+        if (controls.isLocked === true) {
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+            
+            if (!moveUp && !moveDown) {
+                velocity.y -= gravity * delta;
+            } else {
+                 velocity.y = (moveUp ? verticalSpeed : 0) + (moveDown ? -verticalSpeed : 0);
+            }
+
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+            if (moveForward || moveBackward) velocity.z -= direction.z * speed * 100.0 * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * speed * 100.0 * delta;
+            checkWallCollision();
+
+            controls.moveRight(-velocity.x * delta);
+            controls.moveForward(-velocity.z * delta);
+            
+            const verticalDelta = velocity.clone().multiplyScalar(delta);
+            verticalDelta.x = 0; verticalDelta.z = 0; 
+            const hasVerticalCollision = checkVerticalCollision(verticalDelta);   
+            if (!hasVerticalCollision) {
+                playerObject.position.y += verticalDelta.y; 
+            }
+            if (playerObject.position.y < ABSOLUTE_MIN_Y && velocity.y <= 0 && !hasVerticalCollision) {
+                playerObject.position.y = ABSOLUTE_MIN_Y; 
+                velocity.y = 0;
+                if (!moveUp && !moveDown) { 
+                    canJump = true; 
+                }
+            }
+            
+            updateCoordinates();
+        }
+
+        renderer.render(scene, camera);
+    }
+
+</script>
+</body>
+</html>
