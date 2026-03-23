@@ -34,7 +34,6 @@ function renderGallery(data) {
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-         card.innerHTML = `
             <a href="${model.glb}" target="_blank" rel="noopener noreferrer" style="text-decoration: none; color: inherit;">
                 <img src="${model.image}" alt="${model.name}" />
                 <h3>${model.name}</h3>
@@ -55,7 +54,7 @@ function executeFilter(query) {
         const filtered = models.filter(model => regex.test(model.name));
         renderGallery(filtered);
     } catch (e) {
-        console.error("搜索关键字无效:", e);
+        console.error("Error:", e);
         renderGallery(models);
     }
 }
