@@ -6,115 +6,123 @@
   <title>模型预览</title>
   <style>
     body {
-      background-color: #161616;
+      background-color: #000000;
       margin: 0;
-      font-family: Arial, sans-serif;
+      font-family: "Microsoft YaHei", sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
     }
     .container {
       width: 100%;
       max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
+      margin: 20px;
+      padding: 30px;
       box-sizing: border-box;
       text-align: center;
-      color: #fff;
+      color: #eee;
+      background-color: #111111;
+      border: 1px solid #222;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
     .custom-file-upload {
-      border: 1px solid #007bff;
-      color: #007bff;
+      border: 1px solid #00ffcc;
+      color: #00ffcc;
       background-color: transparent;
-      padding: 10px 20px;
-      font-size: 16px;
+      padding: 12px 24px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
       cursor: pointer;
-      border-radius: 5px;
+      border-radius: 0px;
       margin: 10px;
       display: inline-block;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      outline: none;
     }
-    .custom-file-upload:hover {
-      background-color: #007bff;
-      color: #fff;
+    .custom-file-upload:hover:not(:disabled) {
+      background-color: #00ffcc;
+      color: #000;
+      box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+    }
+    .custom-file-upload:disabled {
+      border-color: #444;
+      color: #444;
+      cursor: not-allowed;
+      opacity: 0.6;
     }
     #modelViewerContainer {
       margin-top: 30px;
       width: 100%;
       aspect-ratio: 1 / 1;
       visibility: hidden;
+      position: relative;
+      background-color: #080808;
+      border: 1px solid #222;
     }
     #fileInput {
-        display: none;
+      display: none;
     }
     #uploadPrompt {
-        margin-top: 100px;
-        font-size: 1.5em;
-        color: #aaa;
+      margin-top: 100px;
+      font-size: 1.2em;
+      color: #666;
+      letter-spacing: 1px;
     }
     #loadingBarContainer {
-        width: 60%;
-        margin: 20px auto;
-        height: 15px;
-        background: #333;
-        border-radius: 10px;
-        overflow: hidden;
-        display: none;
+      width: 60%;
+      margin: 20px auto;
+      height: 6px;
+      background: #222;
+      border-radius: 0px;
+      overflow: hidden;
+      display: none;
+      border: 1px solid #333;
     }
     #loadingBar {
-        height: 100%;
-        width: 0%;
-        background: #007bff;
-        transition: width 0.2s ease;
+      height: 100%;
+      width: 0%;
+      background: #00ffcc;
+      transition: width 0.2s ease;
+    }
+    canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
     }
   </style>
 </head>
 <body>
   <div class="container">
-
-    <label for="fileInput" id="uploadBtn" class="custom-file-upload" style="display: none;">
-        上传模型文件
-    </label>
-    <button id="captureBtn" class="custom-file-upload" style="display:none" disabled>
-      捕获图像帧
-    </button>
-
-    <button id="downloadModelBtn" class="custom-file-upload" style="display:none" disabled>
-      下载模型
-    </button>
-
-    <!-- 新增：全屏按钮 -->
-    <button id="fullscreenBtn" class="custom-file-upload" style="display:none" disabled>
-      全屏展示
-    </button>
-
+    <label for="fileInput" id="uploadBtn" class="custom-file-upload" style="display: none;">上传模型文件</label>
+    <button id="captureBtn" class="custom-file-upload" style="display:none" disabled>捕获图像帧</button>
+    <button id="downloadModelBtn" class="custom-file-upload" style="display:none" disabled>下载模型</button>
+    <button id="fullscreenBtn" class="custom-file-upload" style="display:none" disabled>全屏展示</button>
     <input type="file" id="fileInput" accept=".gltf, .glb">
-    
     <a id="downloadLink" style="display: none;">下载图像</a>
-    
-    <div id="uploadPrompt">
-       ...
-    </div>
-
-    <div id="loadingBarContainer">
-        <div id="loadingBar"></div>
-    </div>
-
-    <div id="modelViewerContainer">
-      <model-viewer id="modelViewer"
-                    alt="3D 模型"
-                    autoplay
-                    auto-rotate
-                    camera-controls
-                    background-color="#f0f0f0"
-                    style="width: 100%; height: 100%;">
-      </model-viewer>
-    </div>
+    <div id="uploadPrompt">等待导入模型...</div>
+    <div id="loadingBarContainer"><div id="loadingBar"></div></div>
+    <div id="modelViewerContainer"></div>
   </div>
-  
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
   <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     const urlParams = new URLSearchParams(window.location.search);
     const modelPath = urlParams.get('model');
-
-    const modelViewer = document.getElementById('modelViewer');
     const captureBtn = document.getElementById('captureBtn');
     const downloadModelBtn = document.getElementById('downloadModelBtn');
     const downloadLink = document.getElementById('downloadLink');
@@ -123,127 +131,122 @@
     const modelViewerContainer = document.getElementById('modelViewerContainer');
     const uploadPrompt = document.getElementById('uploadPrompt');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
-
     const loadingBarContainer = document.getElementById("loadingBarContainer");
     const loadingBar = document.getElementById("loadingBar");
 
-    let currentModelUrl = null;
-    let currentModelName = 'model.gltf';
+    let scene, camera, renderer, controls, currentModel;
+    let currentModelUrl = null, currentModelName = 'model.gltf';
+
+    function initThree() {
+      scene = new THREE.Scene();
+      const width = modelViewerContainer.clientWidth;
+      const height = modelViewerContainer.clientHeight;
+
+      camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+      camera.position.set(0, 1, 5);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(width, height);
+      modelViewerContainer.appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 2);
+      scene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+      dirLight.position.set(5, 5, 5);
+      scene.add(dirLight);
+
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      animate();
+    }
 
     function loadModel(url, filename) {
-        loadingBarContainer.style.display = "block";
-        loadingBar.style.width = "0%";
+      if (!scene) initThree();
+      loadingBarContainer.style.display = "block";
+      loadingBar.style.width = "0%";
 
-        modelViewer.src = url;
+      new GLTFLoader().load(url, (gltf) => {
+        if (currentModel) scene.remove(currentModel);
+        currentModel = gltf.scene;
+        scene.add(currentModel);
+
+        const box = new THREE.Box3().setFromObject(currentModel);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const cameraZ = Math.abs(maxDim / 2 / Math.tan(camera.fov * Math.PI / 360)) * 1.5;
+
+        camera.position.set(center.x, center.y, center.z + cameraZ);
+        controls.target.copy(center);
+        controls.update();
+
         currentModelUrl = url;
         currentModelName = filename;
-        
         modelViewerContainer.style.visibility = 'visible';
         uploadPrompt.style.display = 'none';
-
-        captureBtn.style.display = "inline-block";
-        downloadModelBtn.style.display = "inline-block";
-        fullscreenBtn.style.display = "inline-block";
-        
-        captureBtn.disabled = false;
-        downloadModelBtn.disabled = false;
-        fullscreenBtn.disabled = false;
-
-        downloadModelBtn.textContent = "下载模型";
+        captureBtn.style.display = downloadModelBtn.style.display = fullscreenBtn.style.display = "inline-block";
+        captureBtn.disabled = downloadModelBtn.disabled = fullscreenBtn.disabled = false;
+        loadingBar.style.width = "100%";
+        setTimeout(() => { loadingBarContainer.style.display = "none"; }, 400);
+      }, (xhr) => {
+        if (xhr.lengthComputable) loadingBar.style.width = (xhr.loaded / xhr.total * 100) + "%";
+      }, () => {
+        uploadPrompt.textContent = "加载失败";
+      });
     }
 
     if (modelPath) {
-      const decodedModelPath = decodeURIComponent(modelPath);
-      if (decodedModelPath.match(/\.(gltf|glb)$/i)) {
-          loadModel(decodedModelPath, decodedModelPath.split('/').pop());
-      } else {
-          initUploadMode();
-      }
+      const decoded = decodeURIComponent(modelPath);
+      decoded.match(/\.(gltf|glb)$/i) ? loadModel(decoded, decoded.split('/').pop()) : initUploadMode();
     } else {
       initUploadMode();
     }
 
     function initUploadMode() {
-        modelViewerContainer.style.visibility = 'hidden';
-        uploadPrompt.style.display = 'block';
-        uploadBtn.style.display = 'inline-block';
-
-        captureBtn.style.display = "none";
-        downloadModelBtn.style.display = "none";
-        fullscreenBtn.style.display = "none";
-
-        setTimeout(() => {
-            fileInput.click();
-        }, 100);
+      uploadPrompt.style.display = 'block';
+      uploadBtn.style.display = 'inline-block';
+      setTimeout(() => fileInput.click(), 100);
     }
 
-    fileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            const ext = file.name.split('.').pop().toLowerCase();
-            if (ext === 'gltf' || ext === 'glb') {
-                const url = URL.createObjectURL(file);
-                loadModel(url, file.name);
-            } else {
-                alert("文件类型不受支持。请选择 .gltf 或 .glb 文件。");
-                fileInput.value = '';
-            }
-        }
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) loadModel(URL.createObjectURL(file), file.name);
     });
 
-    captureBtn.addEventListener('click', async () => {
-      if (modelViewer.src) {
-        try {
-          const dataUrl = await modelViewer.toDataURL('image/png');
-          downloadLink.href = dataUrl;
-          downloadLink.download = 'capture_' + currentModelName.replace(/\.(gltf|glb)$/i, '') + '.png';
-          downloadLink.click();
-        } catch (error) {
-          alert("截图失败");
-        }
-      }
+    captureBtn.addEventListener('click', () => {
+      downloadLink.href = renderer.domElement.toDataURL('image/png');
+      downloadLink.download = `capture_${currentModelName.split('.')[0]}.png`;
+      downloadLink.click();
     });
 
     downloadModelBtn.addEventListener('click', () => {
-        if (currentModelUrl) {
-            const a = document.createElement('a');
-            a.href = currentModelUrl;
-            a.download = currentModelName; 
-            a.click();
-        }
+      const a = document.createElement('a');
+      a.href = currentModelUrl;
+      a.download = currentModelName;
+      a.click();
     });
 
     fullscreenBtn.addEventListener('click', () => {
-        const elem = modelViewerContainer;
-        if (elem.requestFullscreen) elem.requestFullscreen();
-        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-        else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+      if (modelViewerContainer.requestFullscreen) modelViewerContainer.requestFullscreen();
+      else if (modelViewerContainer.webkitRequestFullscreen) modelViewerContainer.webkitRequestFullscreen();
+      else if (modelViewerContainer.msRequestFullscreen) modelViewerContainer.msRequestFullscreen();
     });
 
-    modelViewer.addEventListener("progress", (event) => {
-        const progress = event.detail.totalProgress;
-        if (progress < 1) {
-            loadingBarContainer.style.display = "block";
-            loadingBar.style.width = (progress * 100) + "%";
-        } else {
-            loadingBar.style.width = "100%";
-            setTimeout(() => {
-                loadingBarContainer.style.display = "none";
-            }, 400);
-        }
-    });
+    function animate() {
+      requestAnimationFrame(animate);
+      if (controls) controls.update();
+      if (renderer) renderer.render(scene, camera);
+    }
 
-    modelViewer.addEventListener("error", () => {
-        uploadPrompt.textContent = "模型加载失败，请重新选择模型文件。";
-        uploadPrompt.style.display = "block";
-        modelViewerContainer.style.visibility = "hidden";
-        captureBtn.style.display = "none";
-        downloadModelBtn.style.display = "none";
-        fullscreenBtn.style.display = "none";
+    window.addEventListener('resize', () => {
+      if (!renderer) return;
+      const w = modelViewerContainer.clientWidth;
+      const h = modelViewerContainer.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
     });
-
   </script>
 </body>
 </html>
-
-
