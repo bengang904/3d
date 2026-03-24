@@ -68,7 +68,7 @@
     #uploadPrompt {
       margin-top: 100px;
       font-size: 1.2em;
-      color: #666;
+      color: #666;      
       letter-spacing: 1px;
     }
     #loadingBarContainer {
@@ -134,26 +134,27 @@
     const loadingBarContainer = document.getElementById("loadingBarContainer");
     const loadingBar = document.getElementById("loadingBar");
 
-    let scene, camera, renderer, controls, currentModel;
-    let currentModelUrl = null, currentModelName = 'model.gltf';
+    let scene, camera, renderer, controls, currentModel, mixer;
+    let currentModelUrl = null, currentModelName = 'model.glb';
+    const clock = new THREE.Clock();
 
     function initThree() {
       scene = new THREE.Scene();
       const width = modelViewerContainer.clientWidth;
       const height = modelViewerContainer.clientHeight;
 
-      camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-      camera.position.set(0, 1, 5);
-
+      camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 10000);
+      
       renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(width, height);
+      renderer.toneMapping = THREE.NoToneMapping;
       modelViewerContainer.appendChild(renderer.domElement);
 
       const ambientLight = new THREE.AmbientLight(0xffffff, 2);
       scene.add(ambientLight);
       const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-      dirLight.position.set(5, 5, 5);
+      dirLight.position.set(5, 10, 7.5);
       scene.add(dirLight);
 
       controls = new OrbitControls(camera, renderer.domElement);
@@ -167,22 +168,40 @@
       loadingBar.style.width = "0%";
 
       new GLTFLoader().load(url, (gltf) => {
-        if (currentModel) scene.remove(currentModel);
+        if (currentModel) {
+          scene.remove(currentModel);
+          if (mixer) mixer.stopAllAction();
+        }
+
         currentModel = gltf.scene;
         scene.add(currentModel);
+
+        if (gltf.animations && gltf.animations.length > 0) {
+          mixer = new THREE.AnimationMixer(currentModel);
+          gltf.animations.forEach((clip) => {
+            mixer.clipAction(clip).play();
+          });
+        }
 
         const box = new THREE.Box3().setFromObject(currentModel);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
-        const cameraZ = Math.abs(maxDim / 2 / Math.tan(camera.fov * Math.PI / 360)) * 1.5;
+        const fov = camera.fov * (Math.PI / 180);
+        
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
 
-        camera.position.set(center.x, center.y, center.z + cameraZ);
+        camera.position.set(center.x, center.y + (size.y * 0.1), center.z + cameraZ);
+        camera.near = maxDim / 100;
+        camera.far = maxDim * 100;
+        camera.updateProjectionMatrix();
+
         controls.target.copy(center);
         controls.update();
 
         currentModelUrl = url;
         currentModelName = filename;
+
         modelViewerContainer.style.visibility = 'visible';
         uploadPrompt.style.display = 'none';
         captureBtn.style.display = downloadModelBtn.style.display = fullscreenBtn.style.display = "inline-block";
@@ -191,7 +210,7 @@
         setTimeout(() => { loadingBarContainer.style.display = "none"; }, 400);
       }, (xhr) => {
         if (xhr.lengthComputable) loadingBar.style.width = (xhr.loaded / xhr.total * 100) + "%";
-      }, () => {
+      }, (error) => {
         uploadPrompt.textContent = "加载失败";
       });
     }
@@ -211,30 +230,40 @@
 
     fileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
-      if (file) loadModel(URL.createObjectURL(file), file.name);
+      if (file) {
+        const url = URL.createObjectURL(file);
+        loadModel(url, file.name);
+      }
     });
 
     captureBtn.addEventListener('click', () => {
       downloadLink.href = renderer.domElement.toDataURL('image/png');
-      downloadLink.download = `capture_${currentModelName.split('.')[0]}.png`;
+      downloadLink.download = `capture_${Date.now()}.png`;
       downloadLink.click();
     });
 
     downloadModelBtn.addEventListener('click', () => {
+      if (!currentModelUrl) return;
       const a = document.createElement('a');
       a.href = currentModelUrl;
       a.download = currentModelName;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
     });
 
     fullscreenBtn.addEventListener('click', () => {
-      if (modelViewerContainer.requestFullscreen) modelViewerContainer.requestFullscreen();
-      else if (modelViewerContainer.webkitRequestFullscreen) modelViewerContainer.webkitRequestFullscreen();
-      else if (modelViewerContainer.msRequestFullscreen) modelViewerContainer.msRequestFullscreen();
+      if (!document.fullscreenElement) {
+        modelViewerContainer.requestFullscreen().catch(err => {});
+      } else {
+        document.exitFullscreen();
+      }
     });
 
     function animate() {
       requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      if (mixer) mixer.update(delta);
       if (controls) controls.update();
       if (renderer) renderer.render(scene, camera);
     }
