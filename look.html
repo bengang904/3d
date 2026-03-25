@@ -1,136 +1,40 @@
 <!DOCTYPE html>
 <html lang="zh">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>模型预览</title>
   <style>
-    body {
-      background-color: #000000;
-      margin: 0;
-      font-family: "Microsoft YaHei", sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 800px;
-      margin: 20px;
-      padding: 30px;
-      box-sizing: border-box;
-      text-align: center;
-      color: #eee;
-      background-color: #111111;
-      border: 1px solid #222;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    }
-
-    .custom-file-upload {
-      border: 1px solid #00ffcc;
-      color: #00ffcc;
-      background-color: transparent;
-      padding: 12px 24px;
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      cursor: pointer;
-      border-radius: 0px;
-      margin: 10px;
-      display: inline-block;
-      transition: all 0.2s ease;
-      text-decoration: none;
-      outline: none;
-    }
-
-    .custom-file-upload:hover:not(:disabled) {
-      background-color: #00ffcc;
-      color: #000;
-      box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
-    }
-
-    .custom-file-upload:disabled {
-      border-color: #444;
-      color: #444;
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-
-    #modelViewerContainer {
-      margin-top: 30px;
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      visibility: hidden;
-      position: relative;
-      background: radial-gradient(circle, #1a1a1a 0%, #080808 100%);
-      border: 1px solid #222;
-    }
-
-    #fileInput {
-      display: none;
-    }
-
-    #uploadPrompt {
-      margin-top: 100px;
-      font-size: 1.2em;
-      color: #666;
-      letter-spacing: 1px;
-    }
-
-    #loadingBarContainer {
-      width: 60%;
-      margin: 20px auto;
-      height: 6px;
-      background: #222;
-      border-radius: 0px;
-      overflow: hidden;
-      display: none;
-      border: 1px solid #333;
-    }
-
-    #loadingBar {
-      height: 100%;
-      width: 0%;
-      background: #00ffcc;
-      transition: width 0.2s ease;
-    }
-
-    canvas {
-      display: block;
-      width: 100% !important;
-      height: 100% !important;
-    }
+    body { background-color: #000000; margin: 0; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .container { width: 100%; max-width: 800px; margin: 20px; padding: 30px; box-sizing: border-box; text-align: center; color: #eee; background-color: #111111; border: 1px solid #222; }
+    .custom-file-upload { border: 1px solid #00ffcc; color: #00ffcc; background-color: transparent; padding: 12px 24px; font-size: 14px; cursor: pointer; margin: 10px; display: inline-block; transition: all 0.2s ease; outline: none; }
+    .custom-file-upload:hover:not(:disabled) { background-color: #00ffcc; color: #000; }
+    .custom-file-upload:disabled { border-color: #444; color: #444; cursor: not-allowed; opacity: 0.6; }
+    #modelViewerContainer { margin-top: 30px; width: 100%; aspect-ratio: 1 / 1; visibility: hidden; position: relative; background: radial-gradient(circle, #1a1a1a 0%, #080808 100%); border: 1px solid #222; }
+    #fileInput { display: none; }
+    #uploadPrompt { margin-top: 100px; font-size: 1.2em; color: #666; }
+    #loadingBarContainer { width: 60%; margin: 20px auto; height: 6px; background: #222; overflow: hidden; display: none; border: 1px solid #333; }
+    #loadingBar { height: 100%; width: 0%; background: #00ffcc; transition: width 0.2s ease; }
+    canvas { display: block; width: 100% !important; height: 100% !important; }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/@egjs/view3d@latest/css/view3d-bundle.min.css">
 </head>
-
 <body>
   <div class="container">
-    <label for="fileInput" id="uploadBtn" class="custom-file-upload" style="display: none;">上传模型文件</label>
+    <label for="fileInput" id="uploadBtn" class="custom-file-upload" style="display:none">上传模型文件</label>
     <button id="captureBtn" class="custom-file-upload" style="display:none" disabled>捕获图像帧</button>
     <button id="downloadModelBtn" class="custom-file-upload" style="display:none" disabled>下载模型</button>
     <button id="fullscreenBtn" class="custom-file-upload" style="display:none" disabled>全屏展示</button>
     <input type="file" id="fileInput" accept=".gltf, .glb">
     <a id="downloadLink" style="display: none;">下载图像</a>
     <div id="uploadPrompt">等待导入模型...</div>
-    <div id="loadingBarContainer">
-      <div id="loadingBar"></div>
-    </div>
+    <div id="loadingBarContainer"><div id="loadingBar"></div></div>
     <div id="modelViewerContainer"></div>
   </div>
 
   <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-      }
-    }
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
   </script>
-
   <script src="https://unpkg.com/@egjs/view3d@latest/dist/view3d.pkgd.min.js"></script>
 
   <script type="module">
@@ -158,6 +62,7 @@
     const clock = new THREE.Clock();
 
     function initThree() {
+      if (scene) return; 
       scene = new THREE.Scene();
       const width = modelViewerContainer.clientWidth;
       const height = modelViewerContainer.clientHeight;
@@ -166,7 +71,6 @@
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(width, height);
       renderer.setClearColor(0x000000, 0);
-      renderer.toneMapping = THREE.NoToneMapping;
       modelViewerContainer.appendChild(renderer.domElement);
       const ambientLight = new THREE.AmbientLight(0xffffff, 2);
       scene.add(ambientLight);
@@ -181,30 +85,20 @@
     function loadModel(url, filename) {
       currentModelUrl = url;
       currentModelName = filename;
-
-      if (engineType === '2') {
-        loadWithView3D(url);
-      } else {
-        loadWithThree(url, filename);
-      }
+      loadingBarContainer.style.display = "block";
+      loadingBar.style.width = "0%";
+      if (engineType === '2') { loadWithView3D(url); } else { loadWithThree(url, filename); }
     }
 
     function loadWithThree(url, filename) {
-      if (!scene) initThree();
-      loadingBarContainer.style.display = "block";
-      loadingBar.style.width = "0%";
+      initThree();
       new GLTFLoader().load(url, (gltf) => {
-        if (currentModel) {
-          scene.remove(currentModel);
-          if (mixer) mixer.stopAllAction();
-        }
+        if (currentModel) { scene.remove(currentModel); if (mixer) mixer.stopAllAction(); }
         currentModel = gltf.scene;
         scene.add(currentModel);
         if (gltf.animations && gltf.animations.length > 0) {
           mixer = new THREE.AnimationMixer(currentModel);
-          gltf.animations.forEach((clip) => {
-            mixer.clipAction(clip).play();
-          });
+          gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
         }
         const box = new THREE.Box3().setFromObject(currentModel);
         const center = box.getCenter(new THREE.Vector3());
@@ -213,17 +107,13 @@
         const fov = camera.fov * (Math.PI / 180);
         let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
         camera.position.set(center.x, center.y + (size.y * 0.1), center.z + cameraZ);
-        camera.near = maxDim / 100;
-        camera.far = maxDim * 100;
         camera.updateProjectionMatrix();
         controls.target.copy(center);
         controls.update();
         showUI();
       }, (xhr) => {
         if (xhr.lengthComputable) loadingBar.style.width = (xhr.loaded / xhr.total * 100) + "%";
-      }, (error) => {
-        uploadPrompt.textContent = "加载失败";
-      });
+      }, () => { uploadPrompt.textContent = "加载失败"; });
     }
 
     function loadWithView3D(url) {
@@ -235,7 +125,11 @@
         centerModel: true,
         canvasSelector: ".view3d-canvas"
       });
+      view3dInstance.on("progress", (e) => {
+        if (e.total > 0) loadingBar.style.width = (e.loaded / e.total * 100) + "%";
+      });
       view3dInstance.on("ready", () => {
+        if (view3dInstance.autoPlayer) view3dInstance.autoPlayer.disable();
         showUI();
       });
     }
@@ -251,33 +145,25 @@
 
     if (modelPath) {
       const decoded = decodeURIComponent(modelPath);
-      decoded.match(/\.(gltf|glb)$/i) ? loadModel(decoded, decoded.split('/').pop()) : initUploadMode();
+      if (decoded.match(/\.(gltf|glb)$/i)) {
+        loadModel(decoded, decoded.split('/').pop());
+      } else {
+        uploadPrompt.style.display = 'block';
+        uploadBtn.style.display = 'inline-block';
+      }
     } else {
-      initUploadMode();
-    }
-
-    function initUploadMode() {
       uploadPrompt.style.display = 'block';
       uploadBtn.style.display = 'inline-block';
-      setTimeout(() => fileInput.click(), 100);
     }
 
     fileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
-      if (file) {
-        const url = URL.createObjectURL(file);
-        loadModel(url, file.name);
-      }
+      if (file) { loadModel(URL.createObjectURL(file), file.name); }
     });
 
-    captureBtn.addEventListener('click', async () => {
-      let canvasElement;
-      if (engineType === '2' && view3dInstance) {
-        canvasElement = view3dInstance.renderer.canvas;
-      } else {
-        canvasElement = renderer.domElement;
-      }
-      downloadLink.href = canvasElement.toDataURL('image/png');
+    captureBtn.addEventListener('click', () => {
+      let cvs = (engineType === '2' && view3dInstance) ? view3dInstance.renderer.canvas : renderer.domElement;
+      downloadLink.href = cvs.toDataURL('image/png');
       downloadLink.download = `capture_${Date.now()}.png`;
       downloadLink.click();
     });
@@ -285,39 +171,31 @@
     downloadModelBtn.addEventListener('click', () => {
       if (!currentModelUrl) return;
       const a = document.createElement('a');
-      a.href = currentModelUrl;
-      a.download = currentModelName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.href = currentModelUrl; a.download = currentModelName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
     });
 
     fullscreenBtn.addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        modelViewerContainer.requestFullscreen().catch(err => {});
-      } else {
-        document.exitFullscreen();
-      }
+      if (!document.fullscreenElement) { modelViewerContainer.requestFullscreen().catch(() => {}); } 
+      else { document.exitFullscreen(); }
     });
 
     function animate() {
       requestAnimationFrame(animate);
-      const delta = clock.getDelta();
-      if (mixer) mixer.update(delta);
-      if (controls) controls.update();
-      if (renderer) renderer.render(scene, camera);
+      if (engineType === '1' && scene) {
+        if (mixer) mixer.update(clock.getDelta());
+        if (controls) controls.update();
+        if (renderer) renderer.render(scene, camera);
+      }
     }
 
     window.addEventListener('resize', () => {
       if (engineType === '1' && renderer) {
-        const w = modelViewerContainer.clientWidth;
-        const h = modelViewerContainer.clientHeight;
-        camera.aspect = w / h;
+        camera.aspect = modelViewerContainer.clientWidth / modelViewerContainer.clientHeight;
         camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
+        renderer.setSize(modelViewerContainer.clientWidth, modelViewerContainer.clientHeight);
       }
     });
   </script>
 </body>
-
 </html>
