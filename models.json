@@ -13,11 +13,6 @@
       "name": "naruto_sala_examen_chunnin",
       "image": "images/naruto_sala_examen_chunnin.png",
       "glb": "look4.html?model=model/naruto_sala_examen_chunnin.glb&cx=-0.1&cy=-0.5&cz=0"
-    },
-     {
-      "name": "Backrooms_VR",
-      "image": "images/Backrooms_VR.png",
-      "glb": "look3.html?model=model/Backrooms_VR.usdz"
     }
   ]
   
